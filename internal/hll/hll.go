@@ -114,7 +114,7 @@ func (h *HLL) Precision() uint { return h.p }
 func (h *HLL) RegisterCount() uint32 { return h.m }
 
 // IsSparse reports whether the sketch is still in the sparse representation.
-func (h *HLL) IsSparse() bool { return h.sparse != nil && h.dense == nil }
+func (h *HLL) IsSparse() bool { return h.sparse != nil }
 
 // SparseSize returns the number of occupied registers while sparse, and 0
 // once the sketch has been promoted to dense.
@@ -238,17 +238,15 @@ func (h *HLL) Densify() {
 // the returned slice freely.
 func (h *HLL) Registers() []uint8 {
 	out := make([]uint8, h.m)
-	if h.dense != nil {
-		copy(out, h.dense)
-		return out
-	}
 	if h.sparse != nil {
 		for index, rho := range h.sparse {
 			if rho > out[index] {
 				out[index] = rho
 			}
 		}
+		return out
 	}
+	copy(out, h.dense)
 	return out
 }
 

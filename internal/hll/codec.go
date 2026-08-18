@@ -103,21 +103,6 @@ func (h *HLL) UnmarshalBinary(data []byte) error {
 	if len(data) < headerLen {
 		return ErrTruncated
 	}
-
-	p := uint(data[magicLen+1])
-	m, perr := hash.RegisterCount(p)
-	body := data[headerLen:]
-	if perr == nil {
-		if maxRho, err := hash.MaxRho(p); err == nil {
-			switch data[magicLen+2] {
-			case modeDense:
-				_ = h.unmarshalDense(p, m, maxRho, body)
-			case modeSparse:
-				_ = h.unmarshalSparse(p, m, maxRho, body)
-			}
-		}
-	}
-
 	for i := 0; i < magicLen; i++ {
 		if data[i] != magic[i] {
 			return ErrBadMagic
@@ -126,14 +111,18 @@ func (h *HLL) UnmarshalBinary(data []byte) error {
 	if data[magicLen] != wireVersion {
 		return ErrBadVersion
 	}
-	if perr != nil {
-		return perr
+
+	p := uint(data[magicLen+1])
+	m, err := hash.RegisterCount(p)
+	if err != nil {
+		return err
 	}
 	maxRho, err := hash.MaxRho(p)
 	if err != nil {
 		return err
 	}
 
+	body := data[headerLen:]
 	switch data[magicLen+2] {
 	case modeDense:
 		return h.unmarshalDense(p, m, maxRho, body)
@@ -151,19 +140,19 @@ func (h *HLL) unmarshalDense(p uint, m uint32, maxRho uint8, body []byte) error 
 	if uint32(len(body)) > m {
 		return ErrTrailingBytes
 	}
-
-	dense := make([]uint8, m)
-	copy(dense, body)
-	h.p = p
-	h.m = m
-	h.maxSparse = sparseLimit(m)
-	h.dense = dense
-
 	for _, v := range body {
 		if v > maxRho {
 			return ErrRhoOutOfRange
 		}
 	}
+
+	dense := make([]uint8, m)
+	copy(dense, body)
+
+	h.p = p
+	h.m = m
+	h.maxSparse = sparseLimit(m)
+	h.dense = dense
 	h.sparse = nil
 	return nil
 }
